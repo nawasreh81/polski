@@ -32,8 +32,12 @@
     return fresh();
   }
   let S = load();
-  function save() {
+  function store() {
     try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
+  }
+  function save() {
+    store();
+    if (window.PLSync) window.PLSync.schedule();
   }
   function item(id) {
     if (!S.items[id]) S.items[id] = { learnedOn: null, errors: 0, seen: 0, right: 0, weak: false };
@@ -829,7 +833,7 @@
     const lt = st.lastTest ? st.lastTest.score + '%' : '—';
     const html =
       '<section class="home">' +
-      '<header class="home-head"><div><p class="brand" dir="ltr" lang="pl">Polski w domu</p><p class="brand-ar">البولندية في البيت</p></div><button type="button" class="icon-only" data-a="settings" aria-label="الإعدادات">' + ICON.gear + '</button></header>' +
+      '<header class="home-head"><div><p class="brand" dir="ltr" lang="pl">Polski w domu</p><p class="brand-ar">البولندية في البيت</p><button type="button" class="cloud" data-a="cloud" hidden></button></div><button type="button" class="icon-only" data-a="settings" aria-label="الإعدادات">' + ICON.gear + '</button></header>' +
       '<div class="voice-warn" hidden></div>' +
       '<div class="card cta">' + cta + '</div>' +
       '<div class="stats">' +
@@ -847,6 +851,8 @@
     const ctaBtn = app.querySelector('.cta .btn');
     if (ctaBtn && ctaAction) ctaBtn.onclick = ctaAction;
     app.querySelector('[data-a=settings]').onclick = settings;
+    app.querySelector('[data-a=cloud]').onclick = settings;
+    updateCloud();
 
     const list = app.querySelector('.lessons');
     D.LESSONS.forEach(function (Ls) {
@@ -918,9 +924,12 @@
       '<p><b>أندرويد (Chrome):</b> اضغط ⋮ في الأعلى ثم "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".</p>' +
       '<p class="note">بعد التثبيت يعمل التطبيق بدون إنترنت، ما عدا التحقق من النطق.</p></div>';
 
-    v += '<div class="card"><h3>تقدمك</h3><p class="note">تقدمك محفوظ على هذا الجهاز فقط. بدأت يوم <span dir="ltr">' + esc(S.startDate) + '</span>.</p><button type="button" class="btn danger" data-a="reset">ابدأ من الصفر</button><div class="reset-confirm" hidden><p>سيُحذف كل تقدمك وأخطاؤك ونتائج اختباراتك. هل أنت متأكد؟</p><div class="row"><button type="button" class="btn danger" data-a="reset-yes">نعم، احذف كل شيء</button><button type="button" class="btn ghost" data-a="reset-no">إلغاء</button></div></div></div>';
+    v = '<div class="card" id="sync-card"></div>' + v;
+
+    v += '<div class="card"><h3>تقدمك</h3><p class="note">تقدمك محفوظ على هذا الجهاز' + (window.PLSync && PLSync.status().email ? '، ونسخة منه في السحابة' : ' فقط') + '. بدأت يوم <span dir="ltr">' + esc(S.startDate) + '</span>.</p><button type="button" class="btn danger" data-a="reset">ابدأ من الصفر</button><div class="reset-confirm" hidden><p>سيُحذف كل تقدمك وأخطاؤك ونتائج اختباراتك. هل أنت متأكد؟</p><div class="row"><button type="button" class="btn danger" data-a="reset-yes">نعم، احذف كل شيء</button><button type="button" class="btn ghost" data-a="reset-no">إلغاء</button></div></div></div>';
 
     F.stage.innerHTML = v;
+    renderSync();
     const sel = F.stage.querySelector('#voice-select');
     if (sel) sel.onchange = function () { S.voice = sel.value; save(); speak('Dzień dobry, kochanie.'); };
     const tv = F.stage.querySelector('[data-a=test-voice]');
@@ -934,10 +943,130 @@
     F.stage.querySelector('[data-a=reset]').onclick = function () { rc.hidden = false; };
     F.stage.querySelector('[data-a=reset-no]').onclick = function () { rc.hidden = true; };
     F.stage.querySelector('[data-a=reset-yes]').onclick = function () {
+      const voice = S.voice;
       S = fresh();
+      S.voice = voice;
+      S.resetAt = Date.now(); // tells the other devices to start from zero too
       save();
       home();
     };
+  }
+
+  /* ---------- Cloud backup (Supabase) ---------- */
+  const CLOUD_TEXT = {
+    synced: 'محفوظ في السحابة',
+    syncing: 'جارٍ الحفظ في السحابة…',
+    offline: 'بدون إنترنت: سيُحفظ عند الاتصال',
+    error: 'تعذّر الحفظ في السحابة',
+    'signed-out': 'سجّل الدخول لحفظ تقدمك في السحابة',
+    recovery: 'اختر كلمة مرور جديدة'
+  };
+  function updateCloud() {
+    const b = app.querySelector('[data-a=cloud]');
+    if (!b) return;
+    if (!window.PLSync || !PLSync.enabled) { b.hidden = true; return; }
+    const st = PLSync.status();
+    b.hidden = false;
+    b.className = 'cloud is-' + st.state;
+    b.textContent = CLOUD_TEXT[st.state] || '';
+  }
+  function when(iso) {
+    try { return new Date(iso).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return iso; }
+  }
+  function renderSync() {
+    const card = document.getElementById('sync-card');
+    if (!card) return;
+    if (!window.PLSync || !PLSync.enabled) {
+      card.innerHTML = '<h3>النسخ الاحتياطي في السحابة</h3><p class="note">غير مفعّل في هذه النسخة من التطبيق. تقدمك محفوظ على هذا الجهاز فقط.</p>';
+      return;
+    }
+    const st = PLSync.status();
+    let html = '<h3>النسخ الاحتياطي في السحابة</h3>';
+    if (st.recovery) {
+      html += '<p class="note">اكتب كلمة مرور جديدة لحسابك.</p>' +
+        '<label class="lbl" for="new-pass">كلمة المرور الجديدة</label><input id="new-pass" type="password" autocomplete="new-password" minlength="8" dir="ltr">' +
+        '<button type="button" class="btn primary" data-a="save-pass">احفظ كلمة المرور</button>';
+    } else if (st.email) {
+      html += '<p>مسجّل الدخول بـ <bdi dir="ltr">' + esc(st.email) + '</bdi></p>' +
+        '<p class="cloud-line is-' + st.state + '">' + esc(CLOUD_TEXT[st.state] || '') + '</p>' +
+        (st.last ? '<p class="note">آخر حفظ: ' + esc(when(st.last)) + '</p>' : '') +
+        (st.state === 'error' && st.error ? '<p class="note">' + esc(st.error) + '</p>' : '') +
+        '<p class="note">افتح التطبيق على أي جهاز وسجّل الدخول بنفس الحساب لتكمل من حيث توقفت.</p>' +
+        '<div class="row"><button type="button" class="btn primary" data-a="sync-now">احفظ الآن</button><button type="button" class="btn ghost" data-a="sign-out">تسجيل الخروج</button></div>';
+    } else {
+      html += '<p class="note">سجّل الدخول ليُحفظ تقدمك في السحابة، فلا يضيع إذا حذفت التطبيق، وتكمل من جهاز آخر.</p>' +
+        '<form class="auth" novalidate>' +
+        '<label class="lbl" for="sync-email">البريد الإلكتروني</label><input id="sync-email" type="email" autocomplete="email" inputmode="email" dir="ltr" required>' +
+        '<label class="lbl" for="sync-pass">كلمة المرور (8 أحرف أو أكثر)</label><input id="sync-pass" type="password" autocomplete="current-password" minlength="8" dir="ltr" required>' +
+        '<div class="row"><button type="submit" class="btn primary" data-a="sign-in">سجّل الدخول</button><button type="button" class="btn ghost" data-a="sign-up">أنشئ حساباً جديداً</button></div>' +
+        '<button type="button" class="linkish" data-a="forgot">نسيت كلمة المرور؟</button>' +
+        '</form>';
+    }
+    html += '<p class="auth-msg" role="status"></p>';
+    card.innerHTML = html;
+    const msg = card.querySelector('.auth-msg');
+    function say(t, ok) { msg.textContent = t; msg.className = 'auth-msg' + (ok ? ' ok' : ' err'); }
+    function busy(btn, on) { btn.disabled = on; }
+
+    const form = card.querySelector('form.auth');
+    if (form) {
+      const email = card.querySelector('#sync-email'), pass = card.querySelector('#sync-pass');
+      function valid(needPass) {
+        if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { say('اكتب بريداً إلكترونياً صحيحاً.'); email.focus(); return false; }
+        if (needPass && pass.value.length < 8) { say('كلمة المرور يجب أن تكون 8 أحرف أو أكثر.'); pass.focus(); return false; }
+        return true;
+      }
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (!valid(true)) return;
+        const b = card.querySelector('[data-a=sign-in]');
+        busy(b, true); say('جارٍ تسجيل الدخول…', true);
+        const r = await PLSync.signIn(email.value.trim(), pass.value);
+        busy(b, false);
+        if (r.error) say(r.error);
+      });
+      card.querySelector('[data-a=sign-up]').onclick = async function () {
+        if (!valid(true)) return;
+        busy(this, true); say('جارٍ إنشاء الحساب…', true);
+        const r = await PLSync.signUp(email.value.trim(), pass.value);
+        busy(this, false);
+        if (r.error) say(r.error);
+        else if (r.confirm) say('تم إنشاء الحساب. افتح بريدك واضغط رابط التأكيد، ثم ارجع وسجّل الدخول.', true);
+      };
+      card.querySelector('[data-a=forgot]').onclick = async function () {
+        if (!valid(false)) return;
+        say('جارٍ الإرسال…', true);
+        const r = await PLSync.resetPassword(email.value.trim());
+        if (r.error) say(r.error);
+        else say('أرسلنا رابطاً إلى بريدك. افتحه لتختار كلمة مرور جديدة.', true);
+      };
+    }
+    const sp = card.querySelector('[data-a=save-pass]');
+    if (sp) sp.onclick = async function () {
+      const p = card.querySelector('#new-pass').value;
+      if (p.length < 8) { say('كلمة المرور يجب أن تكون 8 أحرف أو أكثر.'); return; }
+      busy(sp, true);
+      const r = await PLSync.setNewPassword(p);
+      busy(sp, false);
+      if (r.error) say(r.error); else { renderSync(); PLSync.syncNow(); }
+    };
+    const sn = card.querySelector('[data-a=sync-now]');
+    if (sn) sn.onclick = function () { PLSync.syncNow(); };
+    const so = card.querySelector('[data-a=sign-out]');
+    if (so) so.onclick = async function () { await PLSync.signOut(); renderSync(); };
+  }
+  if (window.PLSync) {
+    PLSync.init({
+      getState: function () { return S; },
+      setState: function (merged) {
+        const before = JSON.stringify(S);
+        S = merged;
+        store();
+        if (JSON.stringify(S) !== before && app.querySelector('.home')) home();
+      },
+      onStatus: function () { updateCloud(); renderSync(); },
+      onRecovery: settings
+    });
   }
 
   /* ---------- Install and offline ---------- */

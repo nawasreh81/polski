@@ -1,9 +1,12 @@
 /* Offline support: the app files are cached on install; fonts are cached the first time they load. */
-const CACHE = 'polski-dom-v1';
+const CACHE = 'polski-dom-v2';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './js/vendor/supabase.js',
+  './js/config.js',
+  './js/sync.js',
   './js/data.js',
   './js/app.js',
   './manifest.webmanifest',
@@ -27,6 +30,7 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
+  // Supabase calls (sign-in, saving progress) always go straight to the network.
   if (url.origin !== self.location.origin && !isFont) return;
 
   // Pages: try the network for updates, fall back to the cached app.
