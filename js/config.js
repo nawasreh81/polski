@@ -3,6 +3,6 @@
    Both are safe to publish. Never put the secret / service_role key here.
    Leave them empty to run the app without sync. */
 window.PL_CONFIG = {
-  supabaseUrl: '',
-  supabaseKey: ''
+  supabaseUrl: 'https://mrtyqvfbveamyecogxlf.supabase.co',
+  supabaseKey: 'sb_publishable_LaSEal_4LDtF_fNTqekQBQ_NC7tNZ0P'
 };

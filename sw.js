@@ -1,5 +1,5 @@
 /* Offline support: the app files are cached on install; fonts are cached the first time they load. */
-const CACHE = 'polski-dom-v2';
+const CACHE = 'polski-dom-v3';
 const ASSETS = [
   './',
   './index.html',
