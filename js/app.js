@@ -21,13 +21,13 @@
     return {
       v: 1, startDate: today(), lessonsDone: [], items: {}, lastLessonOn: null,
       testPassedOn: null, tests: [], listen: { r: 0, t: 0 }, speak: { r: 0, t: 0 },
-      weak: null, weakOn: null, voice: null
+      weak: null, weakOn: null, voice: null, sounds: {}
     };
   }
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && s.v === 1) return s;
+      if (s && s.v === 1) { s.sounds = s.sounds || {}; return s; }
     } catch (e) { /* storage blocked */ }
     return fresh();
   }
@@ -185,11 +185,11 @@
   function norm(s) {
     return s.toLowerCase().replace(/[.,!?;:„”"“'’«»…()\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  const FOLD = { 'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z' };
-  function fold(w) { return w.replace(/[ąćęłńóśźż]/g, function (c) { return FOLD[c]; }); }
+  // A microphone cannot tell these spellings apart, so they count as the same.
+  function phon(w) { return w.replace(/rz/g, 'ż').replace(/ó/g, 'u').replace(/ch/g, 'h'); }
   // Marks which target words were heard, in order (longest common subsequence).
   function matchWords(target, heard) {
-    const a = target.map(fold), b = heard.map(fold);
+    const a = target.map(phon), b = heard.map(phon);
     const n = a.length, m = b.length;
     const dp = [];
     for (let i = 0; i <= n; i++) { dp.push(new Array(m + 1).fill(0)); }
@@ -212,13 +212,71 @@
     const tw = tokens.map(norm);
     let best = null;
     alts.forEach(function (alt) {
-      const ok = matchWords(tw, norm(alt).split(' ').filter(Boolean));
+      const hw = norm(alt).split(' ').filter(Boolean);
+      const ok = matchWords(tw, hw);
       tw.forEach(function (w, k) { if (!w) ok[k] = true; });
       const score = ok.filter(Boolean).length / tw.length;
-      if (!best || score > best.score) best = { alt: alt, ok: ok, score: score };
+      if (!best || score > best.score) best = { alt: alt, ok: ok, score: score, heard: hw };
     });
     best.tokens = tokens;
+    best.words = tw;
     best.pass = best.score === 1;
+    return best;
+  }
+
+  /* ---------- Which sounds are going wrong ---------- */
+  const FAMILY = { 'z': 'z', 'ż': 'z', 'ź': 'z', 'dz': 'dz', 'dż': 'dz', 'dź': 'dz', 's': 's', 'sz': 's', 'ś': 's', 'c': 'c', 'cz': 'c', 'ć': 'c', 'l': 'l', 'ł': 'l', 'ą': 'an', 'ę': 'an', 'i': 'iy', 'y': 'iy' };
+  const NEAR = { z: 'dz', dz: 'z', s: 'c', c: 's' };
+  const PATTERN_AT = 3; // repeated mistakes before a pronunciation lesson appears
+  const RECOVERED_AT = 10; // correct uses in a row that clear it
+  function soundUnits(w) {
+    return phon(w).replace(/dzi(?=[aeouąę])/g, 'dź').replace(/si(?=[aeouąę])/g, 'ś').replace(/ci(?=[aeouąę])/g, 'ć').replace(/zi(?=[aeouąę])/g, 'ź').match(/dź|dż|dz|sz|cz|./g) || [];
+  }
+  function soundRec(f) {
+    if (!S.sounds[f]) S.sounds[f] = { seen: 0, miss: 0, open: 0, run: 0 };
+    return S.sounds[f];
+  }
+  function trackSounds(r) {
+    const used = {};
+    r.words.forEach(function (w, k) {
+      const units = soundUnits(w);
+      if (r.ok[k]) {
+        units.forEach(function (u) {
+          const f = FAMILY[u];
+          if (!f) return;
+          const rec = soundRec(f);
+          rec.seen++; rec.run++;
+          if (rec.run >= RECOVERED_AT) rec.open = 0;
+        });
+        return;
+      }
+      // Find the heard word closest to this one and compare them sound by sound.
+      let bestDiff = null;
+      r.heard.forEach(function (hw, i) {
+        if (used[i]) return;
+        const hu = soundUnits(hw);
+        if (hu.length !== units.length) return;
+        const diff = [];
+        units.forEach(function (u, x) { if (u !== hu[x]) diff.push([u, hu[x]]); });
+        if (diff.length && diff.length <= 2 && (!bestDiff || diff.length < bestDiff.diff.length)) bestDiff = { diff: diff, i: i };
+      });
+      if (!bestDiff) return;
+      used[bestDiff.i] = true;
+      bestDiff.diff.forEach(function (d) {
+        const ft = FAMILY[d[0]], fh = FAMILY[d[1]];
+        if (!ft || !(ft === fh || NEAR[ft] === fh)) return;
+        const rec = soundRec(ft);
+        rec.seen++; rec.miss++; rec.open++; rec.run = 0;
+      });
+    });
+    store();
+  }
+  function soundPattern() {
+    let best = null;
+    (window.PL_SOUNDS || []).forEach(function (g) {
+      const rec = g.family && S.sounds[g.family];
+      if (rec && rec.open >= PATTERN_AT && (!best || rec.open > S.sounds[best.family].open)) best = g;
+    });
     return best;
   }
   function diffHTML(res) {
@@ -226,7 +284,9 @@
   }
 
   /* ---------- Saying a sentence until it is right ----------
-     opts.recall: hide the Polish (test from memory). opts.tries: attempts that still count as correct.
+     opts.recall: hide the Polish (test from memory) and offer the Answer button; using it counts as wrong.
+     opts.noEcho: the sentence is already on screen, so do not repeat it here.
+     opts.tries: attempts that still count as correct.
      Resolves { correct } where correct = said right within opts.tries attempts. */
   function sayTask(box, phrase, opts) {
     opts = opts || {};
@@ -242,12 +302,27 @@
       const target = el.querySelector('.say-target');
 
       function showTarget() {
-        if (!revealed) return;
+        if (!revealed || opts.noEcho) return;
         target.innerHTML = '<p class="pl small" dir="ltr" lang="pl">' + rich(phrase.pl) + '</p>';
       }
       showTarget();
 
+      if (opts.recall) {
+        const ab = h('<button type="button" class="btn ghost answer-btn">الجواب</button>');
+        ab.onclick = function () {
+          failed = true;
+          revealed = true;
+          ab.remove();
+          showTarget();
+          status.textContent = 'سيُحسب هذا السؤال خطأ. استمع وقلها حتى تقولها صحيحة.';
+          speak(phrase.pl, 0.55);
+        };
+        el.insertBefore(ab, status);
+      }
+
       function finish() {
+        const ab = el.querySelector('.answer-btn');
+        if (ab) ab.remove();
         micBtn.hidden = true;
         actions.innerHTML = '';
         const next = h('<button type="button" class="btn primary">التالي</button>');
@@ -287,13 +362,15 @@
           micBtn.disabled = false;
           micBtn.classList.remove('listening');
           const r = evaluate(phrase.pl, alts);
+          trackSounds(r);
           attempts++;
           heard.innerHTML = '<p class="heard-line">سمعتُ: <span dir="ltr" lang="pl">' + esc(r.alt) + '</span></p>';
           if (r.pass) {
             if (attempts > tries) failed = true;
             revealed = true;
             target.innerHTML = '<p class="pl small ok-line" dir="ltr" lang="pl">' + diffHTML(r) + '</p>';
-            status.textContent = attempts === 1 ? 'ممتاز! نطق صحيح.' : 'أحسنت! الآن صحيح.';
+            if (failed && opts.recall) status.textContent = 'نطق صحيح، لكن هذا السؤال يُحسب خطأ.';
+            else status.textContent = attempts === 1 ? 'ممتاز! نطق صحيح.' : 'أحسنت! الآن صحيح.';
             el.classList.add('pass');
             finish();
           } else if (!revealed && attempts < tries) {
@@ -519,7 +596,7 @@
     const sayBox = h('<div class="card say-card"><p class="eyebrow">دورك: قلها بصوتك</p></div>');
     F.stage.appendChild(sayBox);
     speak(p.pl);
-    const r = await sayTask(sayBox, p, { tries: 1 });
+    const r = await sayTask(sayBox, p, { tries: 1, noEcho: true });
     if (!F.fl.alive) return;
     recordSpeak(p.id, r.correct);
   }
@@ -530,13 +607,14 @@
     const others = shuffle(uniq).slice(0, n - 1);
     return shuffle([correct].concat(others));
   }
-  function choiceTask(box, options, correct) {
+  function choiceTask(box, options, correct, polish) {
     return new Promise(function (resolve) {
       const el = h('<div class="choices"></div>');
       let first = true;
       options.forEach(function (o) {
         const b = h('<button type="button" class="choice"></button>');
         b.textContent = o;
+        if (polish) { b.dir = 'ltr'; b.lang = 'pl'; b.classList.add('choice-pl'); }
         b.onclick = function () {
           if (el.classList.contains('answered')) return;
           if (o === correct) {
@@ -550,6 +628,44 @@
           }
         };
         el.appendChild(b);
+      });
+      box.appendChild(el);
+    });
+  }
+  function matchTask(box, pairs) {
+    return new Promise(function (resolve) {
+      let first = true, picked = null, left = pairs.length;
+      const el = h('<div class="match"><div class="match-col" dir="ltr" lang="pl"></div><div class="match-col"></div></div>');
+      shuffle(pairs).forEach(function (p) {
+        const b = h('<button type="button" class="tile"></button>');
+        b.textContent = plain(p.pl);
+        b.onclick = function () {
+          if (b.classList.contains('matched')) return;
+          if (picked) picked.b.classList.remove('on');
+          picked = { b: b, id: p.id };
+          b.classList.add('on');
+          speak(p.pl);
+        };
+        el.children[0].appendChild(b);
+      });
+      shuffle(pairs).forEach(function (p) {
+        const b = h('<button type="button" class="tile tile-ar"></button>');
+        b.textContent = p.ar;
+        b.onclick = function () {
+          if (!picked || b.classList.contains('matched')) return;
+          if (picked.id === p.id) {
+            picked.b.classList.remove('on');
+            picked.b.classList.add('matched');
+            b.classList.add('matched');
+            picked = null;
+            if (--left === 0) resolve({ firstTry: first });
+          } else {
+            first = false;
+            b.classList.add('miss');
+            setTimeout(function () { b.classList.remove('miss'); }, 600);
+          }
+        };
+        el.children[1].appendChild(b);
       });
       box.appendChild(el);
     });
@@ -631,29 +747,70 @@
     return ALL_IDS.filter(function (id) { const it = S.items[id]; return it && it.learnedOn && it.learnedOn < t; });
   }
   function needsTest() { return testIds().length > 0 && S.testPassedOn !== today(); }
-  function formOptions(p) {
-    const tags = tagged(p.pl);
-    if (!tags.length) return null;
-    const tg = tags[Math.floor(Math.random() * tags.length)];
-    const L = D.LEMMAS[tg.lemma];
-    let forms = [];
-    if (L.pos === 'noun') forms = L.sg.concat(L.plur);
-    else if (L.pos === 'adj') forms = [L.m[0], L.f[0], L.n[0], L.pv[0], L.m[1], L.f[3], L.m[4]];
-    else forms = L.pres.concat([L.past + 'em', L.past + 'am', L.past + 'eś', L.past + 'aś', L.past, L.past + 'a']);
-    const seen = {};
-    const distinct = [];
-    forms.join(' / ').split(' / ').forEach(function (f) {
-      const k = f.toLowerCase();
-      if (k !== tg.surface.toLowerCase() && !seen[k]) { seen[k] = 1; distinct.push(f); }
+  /* Question types. Answers are by tapping or by voice; nothing is typed. */
+  const REPLY = {};
+  D.LESSONS.forEach(function (L) {
+    L.dialog.forEach(function (d, i) {
+      const prev = L.dialog[i - 1];
+      if (d.u !== undefined && prev && prev.c) REPLY[L.phrases[d.u].id] = { c: prev.c, ar: prev.ar, who: L.who };
     });
-    if (!distinct.length) return null;
-    const match = /^[A-ZĄĆĘŁŃÓŚŹŻ]/.test(tg.surface);
-    const opts = shuffle(distinct).slice(0, 2).map(function (f) { return match ? f.charAt(0).toUpperCase() + f.slice(1) : f; });
-    return { tag: tg, options: shuffle([tg.surface].concat(opts)) };
+  });
+  const LISTENING = ['listen', 'heard', 'truefalse', 'reply', 'tilesHeard', 'minimal'];
+  const SPOKEN = ['speak', 'replysay'];
+  const SWAPS = [['ż', 'z'], ['sz', 's'], ['cz', 'c'], ['ł', 'l'], ['dz', 'z'], ['rz', 'z']];
+  function clean(w) { return w.replace(/[.,!?…:;]/g, ''); }
+  function wordsOf(p) { return plain(p.pl).split(/\s+/); }
+  function minimalFor(p) {
+    const list = shuffle(wordsOf(p).map(function (w) { return clean(w).toLowerCase(); })).filter(function (w) { return w.length >= 4 && !/[ptk]rz/.test(w); });
+    for (let i = 0; i < list.length; i++) {
+      for (let j = 0; j < SWAPS.length; j++) {
+        if (list[i].indexOf(SWAPS[j][0]) !== -1) return { word: list[i], other: list[i].replace(SWAPS[j][0], SWAPS[j][1]) };
+      }
+    }
+    return null;
   }
-  function blankHTML(p, tg) {
-    const before = p.pl.slice(0, tg.index), after = p.pl.slice(tg.index + tg.len);
-    return rich(before) + '<span class="blank">؟</span>' + rich(after);
+  function kindsFor(p) {
+    const k = ['listen', 'speak', 'heard', 'truefalse', 'tilesHeard', 'tilesAr', 'match'];
+    if (wordsOf(p).length >= 3) k.push('fill');
+    if (REPLY[p.id]) k.push('reply', 'replysay');
+    if (minimalFor(p)) k.push('minimal');
+    return k;
+  }
+  // Never the same type twice in a row, never the way this sentence was last asked,
+  // and never a way it was already answered wrongly until every type has been tried.
+  function pickKind(p, prev) {
+    const it = item(p.id);
+    const all = kindsFor(p);
+    let open = all.filter(function (k) { return (it.failedKinds || []).indexOf(k) === -1; });
+    if (!open.length) { it.failedKinds = []; open = all; }
+    let pool = open.filter(function (k) { return k !== prev && k !== it.lastKind; });
+    if (!pool.length) pool = open.filter(function (k) { return k !== prev; });
+    if (!pool.length) pool = open;
+    // Speaking is the goal of the app, so it comes up more often.
+    pool = pool.concat(pool.filter(function (k) { return SPOKEN.indexOf(k) !== -1; }));
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function otherPhrases(p, n) {
+    const learned = ALL_IDS.filter(function (id) { return id !== p.id && S.items[id] && S.items[id].learnedOn; });
+    const rest = ALL_IDS.filter(function (id) { return id !== p.id && learned.indexOf(id) === -1; });
+    return shuffle(learned).concat(shuffle(rest)).slice(0, n).map(function (id) { return PHRASES[id]; });
+  }
+  function similarPhrases(p, n) {
+    const len = plain(p.pl).length;
+    return ALL_IDS.filter(function (id) { return id !== p.id; }).map(function (id) { return PHRASES[id]; })
+      .sort(function (a, b) { return Math.abs(plain(a.pl).length - len) - Math.abs(plain(b.pl).length - len); })
+      .slice(0, n * 4).sort(function () { return Math.random() - 0.5; }).slice(0, n);
+  }
+  function revealPhrase(card, p) {
+    card.appendChild(h('<p class="pl big reveal" dir="ltr" lang="pl">' + rich(p.pl) + '</p>'));
+    card.appendChild(h('<p class="meaning"></p>')).textContent = p.ar;
+  }
+  function quoteLine(card, r) {
+    const b = h('<div class="bubble them"><p class="who"></p></div>');
+    b.querySelector('.who').textContent = r.who.ar;
+    b.appendChild(audioButtons(r.c));
+    card.appendChild(b);
+    speak(r.c);
   }
   async function testQuestion(F, p, kind) {
     F.stage.innerHTML = '';
@@ -661,40 +818,127 @@
     let correct = false;
     const card = h('<article class="card"></article>');
     F.stage.appendChild(card);
+    function ask(t) { card.appendChild(h('<p class="eyebrow"></p>')).textContent = t; }
+    function pl(list) { return shuffle(list.map(function (x) { return plain(x.pl); })); }
+
     if (kind === 'listen') {
-      card.appendChild(h('<p class="eyebrow">استمع: ما معنى هذه الجملة؟</p>'));
+      ask('استمع: ما معنى هذه الجملة؟');
       card.appendChild(audioButtons(p.pl));
       speak(p.pl);
-      const opts = meaningOptions(p.ar, ALL_IDS.map(function (id) { return PHRASES[id].ar; }), 4);
-      const r = await choiceTask(card, opts, p.ar);
+      const r = await choiceTask(card, meaningOptions(p.ar, ALL_IDS.map(function (id) { return PHRASES[id].ar; }), 4), p.ar);
       if (!F.fl.alive) return false;
       correct = r.firstTry;
-      S.listen.t++; if (correct) S.listen.r++;
       card.appendChild(h('<p class="pl big reveal" dir="ltr" lang="pl">' + rich(p.pl) + '</p>'));
-    } else if (kind === 'form') {
-      const fo = formOptions(p);
-      card.appendChild(h('<p class="eyebrow">اختر الشكل الصحيح للكلمة</p>'));
-      card.appendChild(h('<p class="pl big" dir="ltr" lang="pl">' + blankHTML(p, fo.tag) + '</p>'));
-      card.appendChild(h('<p class="meaning"></p>')).textContent = p.ar;
-      const r = await choiceTask(card, fo.options, fo.tag.surface);
+    } else if (kind === 'heard') {
+      ask('ماذا سمعت؟');
+      card.appendChild(audioButtons(p.pl));
+      speak(p.pl);
+      const r = await choiceTask(card, pl([p].concat(similarPhrases(p, 2))), plain(p.pl), true);
       if (!F.fl.alive) return false;
       correct = r.firstTry;
-      card.querySelector('.pl').innerHTML = rich(p.pl);
+      card.appendChild(h('<p class="meaning"></p>')).textContent = p.ar;
+    } else if (kind === 'truefalse') {
+      const truth = Math.random() < 0.5;
+      const shown = truth ? p.ar : otherPhrases(p, 1)[0].ar;
+      ask('استمع: هل هذا هو المعنى؟');
+      card.appendChild(audioButtons(p.pl));
+      card.appendChild(h('<p class="meaning big-ar"></p>')).textContent = shown;
       speak(p.pl);
+      const r = await choiceTask(card, ['صح', 'خطأ'], truth ? 'صح' : 'خطأ');
+      if (!F.fl.alive) return false;
+      correct = r.firstTry;
+      revealPhrase(card, p);
+    } else if (kind === 'reply' || kind === 'replysay') {
+      const q = REPLY[p.id];
+      ask(kind === 'reply' ? 'ماذا ترد؟' : 'رُدّ بصوتك');
+      quoteLine(card, q);
+      if (kind === 'reply') {
+        const same = p.lesson.phrases.filter(function (x) { return x !== p; });
+        const r = await choiceTask(card, pl([p].concat(shuffle(same).slice(0, 2))), plain(p.pl), true);
+        if (!F.fl.alive) return false;
+        correct = r.firstTry;
+        card.appendChild(h('<p class="meaning"></p>')).textContent = q.ar + ' ← ' + p.ar;
+      } else {
+        card.appendChild(h('<p class="meaning big-ar"></p>')).textContent = 'قل: ' + p.ar;
+        const r = await sayTask(card, p, { recall: true, tries: 2 });
+        if (!F.fl.alive) return false;
+        correct = r.correct;
+      }
+    } else if (kind === 'tilesHeard' || kind === 'tilesAr') {
+      if (kind === 'tilesHeard') {
+        ask('رتّب ما سمعت');
+        card.appendChild(audioButtons(p.pl));
+        speak(p.pl);
+      } else {
+        ask('رتّب الجملة البولندية');
+        card.appendChild(h('<p class="meaning big-ar"></p>')).textContent = p.ar;
+      }
+      const r = await tilesTask(card, p);
+      if (!F.fl.alive) return false;
+      correct = r.firstTry;
+      if (kind === 'tilesHeard') card.appendChild(h('<p class="meaning"></p>')).textContent = p.ar;
+    } else if (kind === 'fill') {
+      const words = wordsOf(p);
+      const cand = words.map(function (w, i) { return i; }).filter(function (i) { return clean(words[i]).length >= 3; });
+      const at = cand.length ? cand[Math.floor(Math.random() * cand.length)] : 0;
+      const answer = clean(words[at]);
+      const low = answer.toLowerCase();
+      const seen = {};
+      seen[low] = 1;
+      const pool = [];
+      shuffle(ALL_IDS).forEach(function (id) {
+        wordsOf(PHRASES[id]).forEach(function (w) {
+          const c = clean(w), k = c.toLowerCase();
+          if (c.length >= 3 && !seen[k]) { seen[k] = 1; pool.push(c); }
+        });
+      });
+      const cap = /^[A-ZĄĆĘŁŃÓŚŹŻ]/.test(answer);
+      const opts = pool.slice(0, 2).map(function (w) { return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w.toLowerCase(); });
+      ask('أكمل الجملة');
+      const line = h('<p class="pl big" dir="ltr" lang="pl"></p>');
+      line.innerHTML = words.map(function (w, i) { return i === at ? '<span class="blank">؟</span>' + esc(w.slice(answer.length)) : esc(w); }).join(' ');
+      card.appendChild(line);
+      card.appendChild(h('<p class="meaning"></p>')).textContent = p.ar;
+      const r = await choiceTask(card, shuffle([answer].concat(opts)), answer, true);
+      if (!F.fl.alive) return false;
+      correct = r.firstTry;
+      line.innerHTML = rich(p.pl);
+      speak(p.pl);
+    } else if (kind === 'match') {
+      ask('صِل كل جملة بمعناها');
+      const r = await matchTask(card, [p].concat(otherPhrases(p, 3)));
+      if (!F.fl.alive) return false;
+      correct = r.firstTry;
+    } else if (kind === 'minimal') {
+      const m = minimalFor(p);
+      ask('ميّز الكلمة: أيهما سمعت؟');
+      card.appendChild(audioButtons(m.word));
+      speak(m.word);
+      const r = await choiceTask(card, shuffle([m.word, m.other]), m.word, true);
+      if (!F.fl.alive) return false;
+      correct = r.firstTry;
+      revealPhrase(card, p);
     } else {
-      card.appendChild(h('<p class="eyebrow">كيف تقول بالبولندية؟</p>'));
+      ask('كيف تقول بالبولندية؟');
       card.appendChild(h('<p class="meaning big-ar"></p>')).textContent = p.ar;
       const r = await sayTask(card, p, { recall: true, tries: 2 });
       if (!F.fl.alive) return false;
       correct = r.correct;
-      S.speak.t++; if (correct) S.speak.r++;
     }
+
+    if (LISTENING.indexOf(kind) !== -1) { S.listen.t++; if (correct) S.listen.r++; }
+    if (SPOKEN.indexOf(kind) !== -1) { S.speak.t++; if (correct) S.speak.r++; }
     it.seen++;
-    if (correct) it.right++; else it.errors++;
+    it.lastKind = kind;
+    if (correct) { it.right++; it.failedKinds = []; }
+    else {
+      it.errors++;
+      it.failedKinds = (it.failedKinds || []).concat(kind);
+    }
     save();
-    if (kind !== 'speak') {
+    if (SPOKEN.indexOf(kind) === -1) {
       const fb = h('<div class="card say-card"><p class="eyebrow"></p></div>');
-      fb.querySelector('.eyebrow').textContent = correct ? 'صحيح! والآن قلها بصوتك' : 'الإجابة الصحيحة في الأعلى. استمع وقلها بصوتك';
+      fb.querySelector('.eyebrow').textContent = correct ? 'صحيح! والآن قلها بصوتك' : 'استمع إلى الجواب الصحيح وقله بصوتك';
       card.classList.add(correct ? 'was-right' : 'was-wrong');
       F.stage.appendChild(fb);
       if (correct) {
@@ -715,15 +959,14 @@
     const fl = F.fl;
     F.close.onclick = confirmLeave(F, 'الخروج من الاختبار؟ ستبدأه من جديد في المرة القادمة.');
     const order = shuffle(ids);
-    const day = daysBetween(S.startDate, today());
     const right = [], wrong = [];
+    let prev = null;
     for (let i = 0; i < order.length; i++) {
       F.progress(i / order.length);
       F.title(label + ' · ' + (i + 1) + ' من ' + order.length);
       const p = PHRASES[order[i]];
-      const kinds = ['listen', 'speak'];
-      if (tagged(p.pl).length && formOptions(p)) kinds.push('form');
-      const kind = kinds[(day + i) % kinds.length];
+      const kind = pickKind(p, prev);
+      prev = kind;
       const ok = await testQuestion(F, p, kind);
       if (!fl.alive) return null;
       (ok ? right : wrong).push(p.id);
@@ -813,6 +1056,7 @@
     if (S.weak && S.weakOn !== t) { S.weak = null; S.weakOn = null; save(); }
     const st = stats();
     const L = nextLesson();
+    const pattern = soundPattern();
     let cta = '';
     let ctaAction = null;
     if (S.weak && S.weak.length) {
@@ -835,6 +1079,7 @@
       '<section class="home">' +
       '<header class="home-head"><div><p class="brand" dir="ltr" lang="pl">Polski w domu</p><p class="brand-ar">البولندية في البيت</p><button type="button" class="cloud" data-a="cloud" hidden></button></div><button type="button" class="icon-only" data-a="settings" aria-label="الإعدادات">' + ICON.gear + '</button></header>' +
       '<div class="voice-warn" hidden></div>' +
+      (pattern ? '<p class="sound-note">لديك درس نطق جديد: <bdi dir="ltr" lang="pl">' + esc(pattern.letters) + '</bdi></p>' : '') +
       '<div class="card cta">' + cta + '</div>' +
       '<div class="stats">' +
       stat(st.mastered + ' <small>من ' + st.learned + '</small>', 'جمل أتقنتها') +
@@ -843,6 +1088,7 @@
       stat(st.speak === null ? '—' : st.speak + '%', 'دقة النطق') +
       '</div>' +
       '<div class="goal"><div class="goal-row"><span>اليوم ' + Math.min(st.day, GOAL_DAYS) + ' من ' + GOAL_DAYS + '</span><span>' + (st.left ? 'باقي ' + st.left + ' يوماً للهدف' : 'وصلت إلى موعد الهدف') + '</span></div><div class="meter"><span style="width:' + Math.min(100, Math.round((st.day / GOAL_DAYS) * 100)) + '%"></span></div><p class="note">سرعة الصوت الآن: ' + Math.round(baseRate() * 100) + '% من السرعة الطبيعية، وتزيد مع كل درس.</p></div>' +
+      '<button type="button" class="letters-entry" data-a="letters"><span class="le-title">الحروف البولندية المتشابهة أو المتقاربة</span><span class="le-sub">شرح الفروق في النطق وتدريب عليها</span></button>' +
       '<h3 class="list-h">الدروس</h3><ol class="lessons"></ol>' +
       legend() +
       '</section>';
@@ -852,9 +1098,20 @@
     if (ctaBtn && ctaAction) ctaBtn.onclick = ctaAction;
     app.querySelector('[data-a=settings]').onclick = settings;
     app.querySelector('[data-a=cloud]').onclick = settings;
+    app.querySelector('[data-a=letters]').onclick = lettersScreen;
     updateCloud();
 
     const list = app.querySelector('.lessons');
+    // Shown only once the day's required test and lesson are finished.
+    const mandatoryDone = !needsTest() && !(S.weak && S.weak.length) && (S.lastLessonOn === t || !L);
+    if (pattern && mandatoryDone) {
+      const li = h('<li class="lesson sound"><span class="num">!</span><div class="l-txt"><p class="l-title">درس نطق خاص بك</p><p class="l-sub" dir="ltr" lang="pl"></p></div></li>');
+      li.querySelector('.l-sub').textContent = pattern.letters;
+      const b = h('<button type="button" class="btn primary small">ابدأ</button>');
+      b.onclick = function () { runSoundLesson(pattern); };
+      li.appendChild(b);
+      list.appendChild(li);
+    }
     D.LESSONS.forEach(function (Ls) {
       const done = S.lessonsDone.indexOf(Ls.id) !== -1;
       const isNext = L && L.id === Ls.id;
@@ -896,6 +1153,122 @@
     if (!w) return;
     w.textContent = msg;
     w.hidden = false;
+  }
+
+  /* ---------- Similar letters section ---------- */
+  function soundAccuracy(g) {
+    const rec = g.family && S.sounds[g.family];
+    if (!rec || rec.seen < 5) return null;
+    return Math.round(((rec.seen - rec.miss) / rec.seen) * 100);
+  }
+  function lettersScreen() {
+    const F = frame('الحروف المتشابهة أو المتقاربة', home);
+    F.stage.appendChild(h('<p class="note">هذا القسم للتدريب فقط، ولا يؤثر على اختباراتك. اضغط على أي كلمة لتسمعها.</p>'));
+    const list = h('<div class="groups"></div>');
+    window.PL_SOUNDS.forEach(function (g) {
+      const acc = soundAccuracy(g);
+      const b = h('<button type="button" class="group-row"><span class="g-letters" dir="ltr" lang="pl"></span><span class="g-title"></span></button>');
+      b.querySelector('.g-letters').textContent = g.letters;
+      b.querySelector('.g-title').textContent = g.title + (acc === null ? '' : ' · دقتك ' + acc + '%');
+      b.onclick = function () { groupScreen(g); };
+      list.appendChild(b);
+    });
+    F.stage.appendChild(list);
+  }
+  function sayWord(w) { return '<button type="button" class="form" data-say="' + esc(w) + '" dir="ltr" lang="pl">' + esc(w) + '</button>'; }
+  function groupScreen(g) {
+    const F = frame(g.title, lettersScreen);
+    let v = '<p class="meaning">' + mixed(g.intro) + '</p>';
+    g.cards.forEach(function (c) {
+      v += '<article class="card sound-card"><div class="sound-head"><p class="pl big" dir="ltr" lang="pl">' + esc(c.letter) + '</p><p class="sound-ar">صوته: ' + esc(c.sound) + '</p></div>' +
+        '<p>' + mixed(c.like) + '</p>' +
+        '<p class="example">مثال: ' + sayWord(c.word) + ' (' + esc(c.ar) + ')</p>' +
+        '<p class="tr">النطق التقريبي: ' + esc(c.tr) + '</p></article>';
+    });
+    v += '<div class="card"><h3>الفرق السمعي</h3><div class="tbl-wrap"><table class="forms"><thead><tr><th>الحرف</th><th>الصوت</th></tr></thead><tbody>' +
+      g.cards.map(function (c) { return '<tr><th scope="row" dir="ltr" lang="pl">' + esc(c.letter) + '</th><td class="td-ar">' + esc(c.sound) + '</td></tr>'; }).join('') +
+      '</tbody></table></div><p class="grammar note"><b>نقطة مهمة:</b> ' + mixed(g.point) + '</p></div>';
+    v += '<div class="card"><h3>كلمات للتدريب</h3><ul class="word-list">' + g.words.map(function (w) {
+      return '<li>' + sayWord(w.pl) + '<span class="w-ar">' + esc(w.ar) + '</span><span class="tr">' + esc(w.tr) + '</span></li>';
+    }).join('') + '</ul>';
+    if (g.pairs.length) {
+      v += '<h3>كلمة واحدة تغيّر المعنى</h3><ul class="word-list">' + g.pairs.map(function (p) {
+        return '<li>' + sayWord(p.a) + '<span class="w-ar">' + esc(p.aAr) + '</span></li><li>' + sayWord(p.b) + '<span class="w-ar">' + esc(p.bAr) + '</span></li>';
+      }).join('') + '</ul>';
+    }
+    v += '<button type="button" class="btn primary" data-a="practice">تدرّب بصوتك</button></div>';
+    F.stage.innerHTML = v;
+    F.stage.querySelector('[data-a=practice]').onclick = function () {
+      runWords(g.title, practiceList(g), function () { groupScreen(g); });
+    };
+  }
+  function practiceList(g) {
+    const list = g.cards.map(function (c) { return { pl: c.word, ar: c.ar, tr: c.tr }; }).concat(g.words);
+    g.pairs.forEach(function (p) { list.push({ pl: p.a, ar: p.aAr, tr: '' }, { pl: p.b, ar: p.bAr, tr: '' }); });
+    const seen = {};
+    return list.filter(function (w) { if (seen[w.pl]) return false; seen[w.pl] = 1; return true; });
+  }
+  async function runWords(title, words, done) {
+    const F = frame(title, null);
+    const fl = F.fl;
+    F.close.onclick = confirmLeave(F, 'الخروج من التدريب؟');
+    for (let i = 0; i < words.length; i++) {
+      F.progress(i / words.length);
+      const w = words[i];
+      F.stage.innerHTML = '';
+      const card = h('<article class="card phrase"><p class="eyebrow"></p><p class="pl big" dir="ltr" lang="pl"></p><p class="meaning"></p></article>');
+      card.querySelector('.eyebrow').textContent = 'كلمة ' + (i + 1) + ' من ' + words.length;
+      card.querySelector('.pl').textContent = w.pl;
+      card.querySelector('.meaning').textContent = w.ar;
+      if (w.tr) card.appendChild(h('<p class="tr"></p>')).textContent = w.tr;
+      card.appendChild(audioButtons(w.pl));
+      F.stage.appendChild(card);
+      const box = h('<div class="card say-card"><p class="eyebrow">قلها بصوتك</p></div>');
+      F.stage.appendChild(box);
+      speak(w.pl);
+      await sayTask(box, { pl: w.pl, ar: w.ar }, { tries: 9, noEcho: true });
+      if (!fl.alive) return;
+    }
+    F.progress(1);
+    done(F);
+  }
+  // Built from the sound the learner keeps missing: words from their own sentences first.
+  function wordsWithSound(g) {
+    const found = [], seen = {};
+    ALL_IDS.forEach(function (id) {
+      if (!S.items[id] || !S.items[id].learnedOn) return;
+      wordsOf(PHRASES[id]).forEach(function (raw) {
+        const w = clean(raw).toLowerCase();
+        if (seen[w] || w.length < 3) return;
+        if (soundUnits(w).some(function (u) { return FAMILY[u] === g.family; })) {
+          seen[w] = 1;
+          found.push({ pl: w, ar: 'من جملة: ' + PHRASES[id].ar, tr: '' });
+        }
+      });
+    });
+    return shuffle(found).slice(0, 4);
+  }
+  function runSoundLesson(g) {
+    const F = frame('درس نطق: ' + g.letters, home);
+    let v = '<article class="card"><p class="eyebrow">لاحظت أن هذه الأصوات تختلط عليك</p><p class="pl big" dir="ltr" lang="pl">' + esc(g.letters) + '</p><p>' + mixed(g.intro) + '</p></article>';
+    g.cards.forEach(function (c) {
+      v += '<article class="card sound-card"><div class="sound-head"><p class="pl big" dir="ltr" lang="pl">' + esc(c.letter) + '</p><p class="sound-ar">صوته: ' + esc(c.sound) + '</p></div><p>' + mixed(c.like) + '</p><p class="example">مثال: ' + sayWord(c.word) + ' (' + esc(c.ar) + ')</p></article>';
+    });
+    v += '<p class="grammar note"><b>نقطة مهمة:</b> ' + mixed(g.point) + '</p><button type="button" class="btn primary big-btn" data-a="go">ابدأ التدريب</button>';
+    F.stage.innerHTML = v;
+    F.stage.querySelector('[data-a=go]').onclick = function () {
+      const list = wordsWithSound(g).concat(practiceList(g)).slice(0, 10);
+      runWords('درس نطق: ' + g.letters, list, function (Fd) {
+        const rec = soundRec(g.family);
+        rec.open = 0;
+        rec.run = 0;
+        save();
+        Fd.stage.innerHTML = '';
+        const c = h('<div class="card result good"><p class="eyebrow">انتهى درس النطق</p><h2>أحسنت!</h2><p>سيستمر التطبيق في متابعة هذه الأصوات أثناء تدريبك.</p><button type="button" class="btn primary">العودة إلى الرئيسية</button></div>');
+        c.querySelector('button').onclick = home;
+        Fd.stage.appendChild(c);
+      });
+    };
   }
 
   /* ---------- Settings ---------- */

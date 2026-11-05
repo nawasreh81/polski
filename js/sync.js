@@ -54,6 +54,12 @@
     m.weak = w.weak; m.weakOn = w.weakOn;
     if (m.weakOn && m.testPassedOn && m.testPassedOn >= m.weakOn) { m.weak = null; m.weakOn = null; }
     m.voice = local.voice;
+    const ls = local.sounds || {}, rs = remote.sounds || {};
+    m.sounds = {};
+    Object.keys(Object.assign({}, ls, rs)).forEach(function (f) {
+      const x = ls[f], y = rs[f];
+      m.sounds[f] = JSON.parse(JSON.stringify(!y || (x && x.seen >= y.seen) ? x : y));
+    });
     return m;
   }
 

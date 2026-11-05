@@ -43,6 +43,19 @@
     };
   }
 
+  // Possessive (mój, twój): same layout as an adjective, with its own endings.
+  function poss(pl, ar, base, s, virile) {
+    const t = s.slice(0, -1); // moim, not mojim
+    return {
+      pos: 'adj', pl, ar,
+      m: [base, s + 'ego', s + 'emu', base + ' / ' + s + 'ego', t + 'im', t + 'im', base],
+      f: [s + 'a', s + 'ej', s + 'ej', s + 'ą', s + 'ą', s + 'ej', s + 'a'],
+      n: [s + 'e', s + 'ego', s + 'emu', s + 'e', t + 'im', t + 'im', s + 'e'],
+      pv: [virile, t + 'ich', t + 'im', t + 'ich', t + 'imi', t + 'ich', virile],
+      pn: [s + 'e', t + 'ich', t + 'im', s + 'e', t + 'imi', t + 'ich', s + 'e']
+    };
+  }
+
   // Verb: present (or future for perfective verbs) plus past-tense stems.
   // past = masculine 3rd person singular (tęsknił), pastV = men's plural (tęsknili).
   function verb(pl, ar, pres, past, pastV, opts) {
@@ -133,6 +146,10 @@
     nowy: adj('nowy', 'جديد', 'now', 'nowi'),
     domowy: adj('domowy', 'منزلي', 'domow', 'domowi'),
 
+    mily: adj('miły', 'لطيف / طيب', 'mił', 'mili'),
+    moj: poss('mój', 'لي / ـي (ملكية)', 'mój', 'moj', 'moi'),
+    twoj: poss('twój', 'لك / ـك (ملكية)', 'twój', 'twoj', 'twoi'),
+
     tesknic: verb('tęsknić', 'يشتاق', ['tęsknię', 'tęsknisz', 'tęskni', 'tęsknimy', 'tęsknicie', 'tęsknią'], 'tęsknił', 'tęsknili'),
     kochac: verb('kochać', 'يحب', ['kocham', 'kochasz', 'kocha', 'kochamy', 'kochacie', 'kochają'], 'kochał', 'kochali'),
     byc: verb('być', 'يكون', ['jestem', 'jesteś', 'jest', 'jesteśmy', 'jesteście', 'są'], 'był', 'byli'),
@@ -163,20 +180,20 @@
       id: 'L1', title: 'جمل النجاة', sub: 'عندما لا تفهم ما يقال لك', unit: 'البداية', who: NEIGHBOR,
       phrases: [
         { pl: 'Przepraszam, nie rozumiem.', ar: 'عذراً، لا أفهم.', tr: 'بشيبراشام، نيي روزوميم' },
-        { pl: 'Proszę powtórzyć.', ar: 'أعِد من فضلك.', tr: 'بروشي بوفتوجيتش', note: 'كلمة Proszę تعني "من فضلك"، وتصلح مع الجميع: الجيران والموظفين والغرباء.' },
+        { pl: 'Proszę powtórzyć.', ar: 'أعِد من فضلك.', tr: 'بروشي بوفتوژيتش', note: 'كلمة Proszę تعني "من فضلك"، وتصلح مع الجميع: الجيران والموظفين والغرباء.' },
         { pl: 'Proszę mówić wolniej.', ar: 'تكلّم ببطء أكثر من فضلك.', tr: 'بروشي موفيتش فولنيي' },
         { pl: 'Mówię trochę po polsku.', ar: 'أتكلم البولندية قليلاً.', tr: 'موفيي تروخي بو بولسكو' },
         { pl: 'Co to znaczy?', ar: 'ماذا يعني هذا؟', tr: 'تسو تو زناتشي؟' },
-        { pl: 'Dziękuję bardzo!', ar: 'شكراً جزيلاً!', tr: 'دجينكويي باردزو' }
+        { pl: 'Dziękuję bardzo!', ar: 'شكراً جزيلاً!', tr: 'جينكويي باردزو' }
       ],
       dialog: [
-        { c: 'Dzień dobry! Pan jest [[nowy|nowy|m]] tutaj?', ar: 'صباح الخير! هل أنت جديد هنا؟' },
+        { c: 'Dzień dobry! Pan [[jest|byc|x]] [[nowy|nowy|m]] tutaj?', ar: 'صباح الخير! هل أنت جديد هنا؟' },
         { u: 0 },
         { c: 'Pytam, czy pan tu mieszka od niedawna?', ar: 'أسألك: هل تسكن هنا منذ وقت قصير؟' },
         { u: 1 },
         { c: 'Czy pan tu mieszka od niedawna?', ar: 'هل تسكن هنا منذ وقت قصير؟' },
         { u: 2 },
-        { c: 'Czy… pan… jest… [[nowy|nowy|m]]?', ar: 'هل… أنت… جديد؟' },
+        { c: 'Czy… pan… [[jest|byc|x]]… [[nowy|nowy|m]]?', ar: 'هل… أنت… جديد؟' },
         { u: 3 },
         { c: 'Super! Witamy w naszym bloku!', ar: 'رائع! أهلاً بك في عمارتنا!' },
         { u: 4 },
@@ -188,16 +205,16 @@
       id: 'L2', title: 'صباح الخير يا حبيبتي', sub: 'أول كلمات اليوم مع زوجتك', unit: 'الأسرة: الزوجة', who: WIFE,
       phrases: [
         { pl: 'Dzień dobry, [[kochanie|kochanie]].', ar: 'صباح الخير يا حبيبتي.', tr: 'جين دوبري، كوخانيي', note: 'kochanie كلمة محايدة، فتقولها للزوجة وتقولها الزوجة لك.' },
-        { pl: 'Dobrze [[spałaś|spac|f]]?', ar: 'هل نمتِ جيداً؟', tr: 'دوبجي سباواش؟', note: 'spałaś للمرأة. لو سألت رجلاً تقول: spałeś.' },
+        { pl: 'Dobrze [[spałaś|spac|f]]?', ar: 'هل نمتِ جيداً؟', tr: 'دوبژي سباواش؟', note: 'spałaś للمرأة. لو سألت رجلاً تقول: spałeś.' },
         { pl: 'Jak się czujesz?', ar: 'كيف تشعرين؟', tr: 'ياك شيي تشوييش؟' },
         { pl: 'Zrobię ci [[kawę|kawa]].', ar: 'سأعدّ لكِ القهوة.', tr: 'زروبيي تشي كافي', note: 'kawa تصبح kawę لأنها مفعول به (Biernik).' },
         { pl: 'Wyglądasz pięknie.', ar: 'تبدين جميلة.', tr: 'فيغلونداش بيينكنيي' },
-        { pl: 'Miłego [[dnia|dzien]]!', ar: 'يوماً سعيداً!', tr: 'ميويغو دنيا' }
+        { pl: '[[Miłego|mily|m]] [[dnia|dzien]]!', ar: 'يوماً سعيداً!', tr: 'ميويغو دنيا' }
       ],
       dialog: [
         { c: 'Dzień dobry!', ar: 'صباح الخير!' },
         { u: 0 },
-        { c: 'Jeszcze jestem śpiąca…', ar: 'ما زلت نعسانة…' },
+        { c: 'Jeszcze [[jestem|byc|x]] śpiąca…', ar: 'ما زلت نعسانة…' },
         { u: 1 },
         { c: 'Tak, ale krótko.', ar: 'نعم، لكن لوقت قصير.' },
         { u: 2 },
@@ -212,15 +229,15 @@
     {
       id: 'L3', title: 'كلمات الإعجاب', sub: 'امدح جمالها وابتسامتها', unit: 'الأسرة: الزوجة', who: WIFE,
       phrases: [
-        { pl: 'Jesteś [[piękna|piekny|f]].', ar: 'أنتِ جميلة.', tr: 'يستيش بيينكنا', note: 'piękna للمؤنث، piękny للمذكر، piękne للمحايد.' },
-        { pl: 'Masz [[piękny|piekny|m]] [[uśmiech|usmiech]].', ar: 'لديكِ ابتسامة جميلة.', tr: 'ماش بيينكني أوشمييخ', note: 'uśmiech مذكر في البولندية، لذلك الصفة piękny.' },
-        { pl: '[[Kocham|kochac|x]] twój [[uśmiech|usmiech]].', ar: 'أحب ابتسامتك.', tr: 'كوخام تفوي أوشمييخ' },
-        { pl: 'Jesteś dla mnie wszystkim.', ar: 'أنتِ كل شيء بالنسبة لي.', tr: 'يستيش دلا مني فشيستكيم' },
-        { pl: 'Ślicznie dziś wyglądasz.', ar: 'تبدين رائعة اليوم.', tr: 'شليتشنيي دجيش فيغلونداش' },
-        { pl: 'Masz [[piękne|piekny|p]] oczy.', ar: 'عيناكِ جميلتان.', tr: 'ماش بيينكني أوتشي', note: 'oczy (العينان) جمع، فالصفة بصيغة الجمع: piękne.' }
+        { pl: '[[Jesteś|byc|x]] [[piękna|piekny|f]].', ar: 'أنتِ جميلة.', tr: 'يستيش بيينكنا', note: 'piękna للمؤنث، piękny للمذكر، piękne للمحايد.' },
+        { pl: '[[Masz|miec|x]] [[piękny|piekny|m]] [[uśmiech|usmiech]].', ar: 'لديكِ ابتسامة جميلة.', tr: 'ماش بيينكني أوشمييخ', note: 'الصفة تتبع الاسم الذي تصفه، وليس الشخص الذي تخاطبه. هنا piękny تصف الابتسامة، وكلمة uśmiech مذكرة في البولندية مع أن "ابتسامة" مؤنثة بالعربية. قارن مع Jesteś piękna: هنا الصفة تصف زوجتك نفسها، فتكون مؤنثة.' },
+        { pl: '[[Kocham|kochac|x]] [[twój|twoj|m]] [[uśmiech|usmiech]].', ar: 'أحب ابتسامتك.', tr: 'كوخام تفوي أوشمييخ', note: 'twój مذكرة لأن uśmiech مذكر، حتى وأنت تخاطب امرأة.' },
+        { pl: '[[Jesteś|byc|x]] dla mnie wszystkim.', ar: 'أنتِ كل شيء بالنسبة لي.', tr: 'يستيش دلا مني فشيستكيم' },
+        { pl: 'Ślicznie dziś wyglądasz.', ar: 'تبدين رائعة اليوم.', tr: 'شليتشنيي جيش فيغلونداش' },
+        { pl: '[[Masz|miec|x]] [[piękne|piekny|p]] oczy.', ar: 'عيناكِ جميلتان.', tr: 'ماش بيينكني أوتشي', note: 'oczy (العينان) جمع، فالصفة بصيغة الجمع: piękne.' }
       ],
       dialog: [
-        { c: '[[Kochanie|kochanie]], co myślisz o tej sukience?', ar: 'حبيبي، ما رأيك في هذا الفستان؟' },
+        { c: '[[Kochanie|kochanie]], co [[myślisz|myslec|x]] o tej sukience?', ar: 'حبيبي، ما رأيك في هذا الفستان؟' },
         { u: 0 },
         { c: 'Naprawdę?', ar: 'حقاً؟' },
         { u: 5 },
@@ -230,7 +247,7 @@
         { u: 1 },
         { c: 'Ty zawsze wiesz, co powiedzieć.', ar: 'أنت دائماً تعرف ماذا تقول.' },
         { u: 2 },
-        { c: 'A ty jesteś moim [[kochaniem|kochanie]].', ar: 'وأنت حبيبي.' },
+        { c: 'A ty [[jesteś|byc|x]] [[moim|moj|n]] [[kochaniem|kochanie]].', ar: 'وأنت حبيبي.' },
         { u: 3 }
       ]
     },
@@ -240,9 +257,9 @@
         { pl: '[[Tęskniłem|tesknic|m]] za tobą.', ar: 'اشتقتُ إليكِ.', tr: 'تينسكنيويم زا توبوم', note: 'هذه صيغة الرجل. المرأة تقول: Tęskniłam.' },
         { pl: '[[Kocham|kochac|x]] cię.', ar: 'أحبكِ.', tr: 'كوخام تشي' },
         { pl: 'Bardzo cię [[kocham|kochac|x]].', ar: 'أحبكِ كثيراً.', tr: 'باردزو تشي كوخام' },
-        { pl: '[[Myślę|myslec|x]] o tobie [[cały|caly|m]] [[dzień|dzien]].', ar: 'أفكر فيكِ طوال اليوم.', tr: 'ميشلي أو توبيي تساوي جين' },
-        { pl: 'Jesteś moim [[skarbem|skarb]].', ar: 'أنتِ كنزي.', tr: 'يستيش مويم سكاربيم', note: 'بعد jestem / jesteś يأتي الاسم في حالة Narzędnik: skarb تصبح skarbem.' },
-        { pl: 'Jesteś [[miłością|milosc]] mojego [[życia|zycie]].', ar: 'أنتِ حب حياتي.', tr: 'يستيش ميووشتشوم موييغو جيتشا' }
+        { pl: '[[Myślę|myslec|x]] o tobie [[cały|caly|m]] [[dzień|dzien]].', ar: 'أفكر فيكِ طوال اليوم.', tr: 'ميشلي أو توبيي تساوي جين', note: 'cały مذكرة لأنها تصف dzień، وهي كلمة مذكرة.' },
+        { pl: '[[Jesteś|byc|x]] [[moim|moj|m]] [[skarbem|skarb]].', ar: 'أنتِ كنزي.', tr: 'يستيش مويم سكاربيم', note: 'بعد jestem / jesteś يأتي الاسم في حالة Narzędnik: skarb تصبح skarbem. وكلمة skarb مذكرة دائماً، لذلك تقول moim حتى لزوجتك.' },
+        { pl: '[[Jesteś|byc|x]] [[miłością|milosc]] [[mojego|moj|n]] [[życia|zycie]].', ar: 'أنتِ حب حياتي.', tr: 'يستيش ميووشتشوم موييغو ژيتشا' }
       ],
       dialog: [
         { c: 'Wróciłam! [[Tęskniłeś|tesknic|m]]?', ar: 'عدت! هل اشتقت لي؟' },
@@ -253,46 +270,46 @@
         { u: 2 },
         { c: '[[Myślałeś|myslec|m]] o mnie?', ar: 'هل فكرت بي؟' },
         { u: 3 },
-        { c: 'Jesteś słodki.', ar: 'أنت لطيف.' },
+        { c: '[[Jesteś|byc|x]] słodki.', ar: 'أنت لطيف.' },
         { u: 4 },
-        { c: 'A ty jesteś moim mężem.', ar: 'وأنت زوجي.' },
+        { c: 'A ty [[jesteś|byc|x]] [[moim|moj|m]] mężem.', ar: 'وأنت زوجي.' },
         { u: 5 }
       ]
     },
     {
       id: 'L5', title: 'الشكر والتقدير', sub: 'قدّر ما تفعله لأجلك', unit: 'الأسرة: الزوجة', who: WIFE,
       phrases: [
-        { pl: 'Dziękuję ci za wszystko.', ar: 'شكراً لكِ على كل شيء.', tr: 'دجينكويي تشي زا فشيستكو' },
-        { pl: 'Jesteś [[wspaniałą|wspanialy|f]] [[żoną|zona]].', ar: 'أنتِ زوجة رائعة.', tr: 'يستيش فسبانياوم جونوم', note: 'بعد jesteś تأتي الصفة والاسم في Narzędnik: wspaniała żona تصبح wspaniałą żoną.' },
-        { pl: 'Jestem z tobą [[szczęśliwy|szczesliwy|m]].', ar: 'أنا سعيد معكِ.', tr: 'يستيم ز توبوم شتشينشليفي', note: 'المرأة تقول: szczęśliwa.' },
+        { pl: 'Dziękuję ci za wszystko.', ar: 'شكراً لكِ على كل شيء.', tr: 'جينكويي تشي زا فشيستكو' },
+        { pl: '[[Jesteś|byc|x]] [[wspaniałą|wspanialy|f]] [[żoną|zona]].', ar: 'أنتِ زوجة رائعة.', tr: 'يستيش فسبانياوم ژونوم', note: 'بعد jesteś تأتي الصفة والاسم في Narzędnik: wspaniała żona تصبح wspaniałą żoną.' },
+        { pl: '[[Jestem|byc|x]] z tobą [[szczęśliwy|szczesliwy|m]].', ar: 'أنا سعيد معكِ.', tr: 'يستيم ز توبوم شتشينشليفي', note: 'المرأة تقول: szczęśliwa.' },
         { pl: 'Doceniam wszystko, co [[robisz|robic|x]].', ar: 'أقدّر كل ما تفعلينه.', tr: 'دوتسينيام فشيستكو، تسو روبيش' },
         { pl: 'Bez ciebie nie dam rady.', ar: 'بدونكِ لا أستطيع.', tr: 'بيز تشيبيي نيي دام رادي' },
-        { pl: 'Jesteś najlepsza.', ar: 'أنتِ الأفضل.', tr: 'يستيش نايليبشا', note: 'للمرأة najlepsza، وللرجل najlepszy.' }
+        { pl: '[[Jesteś|byc|x]] najlepsza.', ar: 'أنتِ الأفضل.', tr: 'يستيش نايليبشا', note: 'للمرأة najlepsza، وللرجل najlepszy.' }
       ],
       dialog: [
-        { c: '[[Kolacja|kolacja]] gotowa!', ar: 'العشاء جاهز!' },
+        { c: '[[Kolacja|kolacja]] [[gotowa|gotowy|f]]!', ar: 'العشاء جاهز!' },
         { u: 0 },
         { c: 'Nie ma za co. Lubię dla ciebie gotować.', ar: 'لا شكر على واجب. أحب أن أطبخ لك.' },
         { u: 3 },
         { c: 'Smakuje ci?', ar: 'هل أعجبك الطعم؟' },
         { u: 5 },
-        { c: 'Jesteś [[szczęśliwy|szczesliwy|m]]?', ar: 'هل أنت سعيد؟' },
+        { c: '[[Jesteś|byc|x]] [[szczęśliwy|szczesliwy|m]]?', ar: 'هل أنت سعيد؟' },
         { u: 2 },
-        { c: 'Ja też. Jesteśmy [[dobrą|dobry|f]] [[rodziną|rodzina]].', ar: 'وأنا أيضاً. نحن عائلة جيدة.' },
+        { c: 'Ja też. [[Jesteśmy|byc|x]] [[dobrą|dobry|f]] [[rodziną|rodzina]].', ar: 'وأنا أيضاً. نحن عائلة جيدة.' },
         { u: 1 },
-        { c: 'Ty też jesteś [[wspaniały|wspanialy|m]].', ar: 'وأنت أيضاً رائع.' },
+        { c: 'Ty też [[jesteś|byc|x]] [[wspaniały|wspanialy|m]].', ar: 'وأنت أيضاً رائع.' },
         { u: 4 }
       ]
     },
     {
       id: 'L6', title: 'دعوة رومانسية', sub: 'ادعُها إلى عشاء لكما وحدكما', unit: 'الأسرة: الزوجة', who: WIFE,
       phrases: [
-        { pl: 'Chodźmy dziś na [[kolację|kolacja]].', ar: 'لنذهب الليلة إلى العشاء.', tr: 'خودجمي دجيش نا كولاتسيي' },
+        { pl: 'Chodźmy dziś na [[kolację|kolacja]].', ar: 'لنذهب الليلة إلى العشاء.', tr: 'خوجمي جيش نا كولاتسيي' },
         { pl: 'Tylko ty i ja.', ar: 'أنتِ وأنا فقط.', tr: 'تيلكو تي إي يا' },
-        { pl: '[[Mam|miec|x]] dla ciebie [[niespodziankę|niespodzianka]].', ar: 'عندي لكِ مفاجأة.', tr: 'مام دلا تشيبيي نيسبودجانكي' },
+        { pl: '[[Mam|miec|x]] dla ciebie [[niespodziankę|niespodzianka]].', ar: 'عندي لكِ مفاجأة.', tr: 'مام دلا تشيبيي نييسبوجانكي' },
         { pl: '[[Zarezerwowałem|zarezerwowac|m]] stolik.', ar: 'حجزتُ طاولة.', tr: 'زاريزيرفوفاويم ستوليك', note: 'صيغة الرجل في الماضي تنتهي بـ łem. المرأة تقول: zarezerwowałam.' },
-        { pl: 'Bądź [[gotowa|gotowy|f]] [[wieczorem|wieczor]].', ar: 'كوني جاهزة في المساء.', tr: 'بوندج غوتوفا فيتشوريم', note: 'wieczorem تعني "في المساء"، وهي wieczór في حالة Narzędnik.' },
-        { pl: 'To będzie [[piękny|piekny|m]] [[wieczór|wieczor]].', ar: 'ستكون أمسية جميلة.', tr: 'تو بيندجيي بيينكني فيتشور' }
+        { pl: 'Bądź [[gotowa|gotowy|f]] [[wieczorem|wieczor]].', ar: 'كوني جاهزة في المساء.', tr: 'بونج غوتوفا فيتشوريم', note: 'wieczorem تعني "في المساء"، وهي wieczór في حالة Narzędnik.' },
+        { pl: 'To będzie [[piękny|piekny|m]] [[wieczór|wieczor]].', ar: 'ستكون أمسية جميلة.', tr: 'تو بينجيي بيينكني فيتشور', note: 'piękny مذكرة لأنها تصف wieczór، وهي كلمة مذكرة.' }
       ],
       dialog: [
         { c: 'Co [[robimy|robic|x]] dziś [[wieczorem|wieczor]]?', ar: 'ماذا سنفعل هذا المساء؟' },
@@ -312,19 +329,19 @@
     {
       id: 'L7', title: 'كلام شاعري', sub: 'جمل من القلب للحظات الهادئة', unit: 'الأسرة: الزوجة', who: WIFE,
       phrases: [
-        { pl: 'Jesteś moim [[słońcem|slonce]].', ar: 'أنتِ شمسي.', tr: 'يستيش مويم سووينتسيم' },
-        { pl: 'Moje [[serce|serce]] bije tylko dla ciebie.', ar: 'قلبي ينبض لكِ وحدكِ.', tr: 'موييه سيرتسي بيييه تيلكو دلا تشيبيي' },
-        { pl: 'Każdy [[dzień|dzien]] z tobą jest [[piękny|piekny|m]].', ar: 'كل يوم معكِ جميل.', tr: 'كاجدي جين ز توبوم يست بيينكني' },
-        { pl: 'Twoje oczy są jak [[gwiazdy|gwiazda|p]].', ar: 'عيناكِ مثل النجوم.', tr: 'تفوييه أوتشي سوم ياك غفيازدي' },
+        { pl: '[[Jesteś|byc|x]] [[moim|moj|n]] [[słońcem|slonce]].', ar: 'أنتِ شمسي.', tr: 'يستيش مويم سووينتسيم', note: 'słońce كلمة محايدة، فتقولها لزوجتك كما هي، و moim تتبعها وليس زوجتك.' },
+        { pl: '[[Moje|moj|n]] [[serce|serce]] bije tylko dla ciebie.', ar: 'قلبي ينبض لكِ وحدكِ.', tr: 'موييه سيرتسي بيييه تيلكو دلا تشيبيي', note: 'moje محايدة لأن serce كلمة محايدة.' },
+        { pl: 'Każdy [[dzień|dzien]] z tobą [[jest|byc|x]] [[piękny|piekny|m]].', ar: 'كل يوم معكِ جميل.', tr: 'كاژدي جين ز توبوم يست بيينكني', note: 'piękny تصف اليوم dzień، وليس زوجتك.' },
+        { pl: '[[Twoje|twoj|p]] oczy [[są|byc|p]] jak [[gwiazdy|gwiazda|p]].', ar: 'عيناكِ مثل النجوم.', tr: 'تفوييه أوتشي سوم ياك غفيازدي' },
         { pl: 'Z tobą czas się zatrzymuje.', ar: 'معكِ يتوقف الزمن.', tr: 'ز توبوم تشاس شيي زاتشيمويه' },
-        { pl: '[[Chcę|chciec|x]] się z tobą zestarzeć.', ar: 'أريد أن أكبر في العمر معكِ.', tr: 'خيتسي شيي ز توبوم زيستاجيتش' }
+        { pl: '[[Chcę|chciec|x]] się z tobą zestarzeć.', ar: 'أريد أن أكبر في العمر معكِ.', tr: 'ختسي شيي ز توبوم زيستاژيتش' }
       ],
       dialog: [
         { c: 'Spójrz, jakie [[piękne|piekny|n]] niebo!', ar: 'انظر، ما أجمل السماء!' },
         { u: 3 },
-        { c: 'Jesteś dziś bardzo romantyczny.', ar: 'أنت رومانسي جداً اليوم.' },
+        { c: '[[Jesteś|byc|x]] dziś bardzo romantyczny.', ar: 'أنت رومانسي جداً اليوم.' },
         { u: 0 },
-        { c: 'A ty moim księżycem.', ar: 'وأنت قمري.' },
+        { c: 'A ty [[moim|moj|m]] księżycem.', ar: 'وأنت قمري.' },
         { u: 1 },
         { c: 'Naprawdę?', ar: 'حقاً؟' },
         { u: 2 },
@@ -339,13 +356,13 @@
       phrases: [
         { pl: 'Przepraszam, [[kochanie|kochanie]].', ar: 'آسف يا حبيبتي.', tr: 'بشيبراشام، كوخانيي' },
         { pl: 'Nie [[miałem|miec|m]] racji.', ar: 'لم أكن على حق.', tr: 'نيي مياويم راتسيي', note: 'المرأة تقول: Nie miałam racji.' },
-        { pl: 'Nie [[chciałem|chciec|m]] cię zranić.', ar: 'لم أقصد أن أجرحكِ.', tr: 'نيي خشياويم تشي زرانيتش' },
+        { pl: 'Nie [[chciałem|chciec|m]] cię zranić.', ar: 'لم أقصد أن أجرحكِ.', tr: 'نيي ختشياويم تشي زرانيتش' },
         { pl: 'Wybacz mi, proszę.', ar: 'سامحيني من فضلك.', tr: 'فيباتش مي، بروشي' },
-        { pl: 'Pogódźmy się.', ar: 'لنتصالح.', tr: 'بوغودجمي شيي' },
+        { pl: 'Pogódźmy się.', ar: 'لنتصالح.', tr: 'بوغوجمي شيي' },
         { pl: '[[Kocham|kochac|x]] cię, nawet kiedy się kłócimy.', ar: 'أحبكِ حتى عندما نتشاجر.', tr: 'كوخام تشي، نافيت كييدي شيي كووتشيمي' }
       ],
       dialog: [
-        { c: 'Jestem na ciebie zła.', ar: 'أنا غاضبة منك.' },
+        { c: '[[Jestem|byc|x]] na ciebie zła.', ar: 'أنا غاضبة منك.' },
         { u: 0 },
         { c: 'Wczoraj [[byłeś|byc|m]] niemiły.', ar: 'أمس كنت غير لطيف.' },
         { u: 1 },
@@ -364,11 +381,11 @@
       id: 'L9', title: 'كيف كان يومك؟', sub: 'اسأل ابنك عن يومه ومدرسته', unit: 'الأسرة: الأولاد', who: SON,
       phrases: [
         { pl: 'Cześć! Jak [[było|byc|n]] w [[szkole|szkola]]?', ar: 'مرحباً! كيف كانت المدرسة؟', tr: 'تشيشتش! ياك بيوو ف شكولي؟', note: 'było بصيغة المحايد لأن السؤال عن "الحال" بشكل عام.' },
-        { pl: 'Co dzisiaj [[robiłeś|robic|m]]?', ar: 'ماذا فعلت اليوم؟', tr: 'تسو دجيشاي روبيويش؟', note: 'للابن robiłeś، وللبنت robiłaś.' },
-        { pl: 'Jesteś [[głodny|glodny|m]]?', ar: 'هل أنت جائع؟', tr: 'يستيش غوودني؟', note: 'للبنت: Jesteś głodna?' },
-        { pl: '[[Masz|miec|x]] dużo [[zadań|zadanie|p]] [[domowych|domowy|p]]?', ar: 'هل عندك واجبات كثيرة؟', tr: 'ماش دوجو زادان دوموفيخ؟', note: 'بعد dużo (كثير) يأتي الاسم في Dopełniacz الجمع: zadania تصبح zadań.' },
-        { pl: 'Opowiedz mi wszystko.', ar: 'احكِ لي كل شيء.', tr: 'أوبوفييدج مي فشيستكو' },
-        { pl: 'Wszystko w porządku?', ar: 'هل كل شيء على ما يرام؟', tr: 'فشيستكو ف بوجوندكو؟' }
+        { pl: 'Co dzisiaj [[robiłeś|robic|m]]?', ar: 'ماذا فعلت اليوم؟', tr: 'تسو جيشاي روبيويش؟', note: 'للابن robiłeś، وللبنت robiłaś.' },
+        { pl: '[[Jesteś|byc|x]] [[głodny|glodny|m]]?', ar: 'هل أنت جائع؟', tr: 'يستيش غوودني؟', note: 'للبنت: Jesteś głodna?' },
+        { pl: '[[Masz|miec|x]] dużo [[zadań|zadanie|p]] [[domowych|domowy|p]]?', ar: 'هل عندك واجبات كثيرة؟', tr: 'ماش دوژو زادان دوموفيخ؟', note: 'بعد dużo (كثير) يأتي الاسم في Dopełniacz الجمع: zadania تصبح zadań.' },
+        { pl: 'Opowiedz mi wszystko.', ar: 'احكِ لي كل شيء.', tr: 'أوبوفييج مي فشيستكو' },
+        { pl: 'Wszystko w porządku?', ar: 'هل كل شيء على ما يرام؟', tr: 'فشيستكو ف بوژوندكو؟' }
       ],
       dialog: [
         { c: 'Cześć, tato!', ar: 'مرحباً يا أبي!' },
@@ -377,23 +394,23 @@
         { u: 1 },
         { c: '[[Mieliśmy|miec|p]] test z matmy.', ar: 'كان عندنا اختبار رياضيات.' },
         { u: 5 },
-        { c: 'Tak. I mamy [[nowego|nowy|m]] nauczyciela!', ar: 'نعم. وعندنا معلم جديد!' },
+        { c: 'Tak. I [[mamy|miec|x]] [[nowego|nowy|m]] nauczyciela!', ar: 'نعم. وعندنا معلم جديد!' },
         { u: 4 },
-        { c: 'Jest fajny, ale daje dużo pracy.', ar: 'إنه لطيف، لكنه يعطي عملاً كثيراً.' },
+        { c: '[[Jest|byc|x]] fajny, ale daje dużo pracy.', ar: 'إنه لطيف، لكنه يعطي عملاً كثيراً.' },
         { u: 3 },
         { c: 'Tak, niestety…', ar: 'نعم، للأسف…' },
         { u: 2 },
-        { c: 'Bardzo! Co jest na obiad?', ar: 'جداً! ماذا على الغداء؟' }
+        { c: 'Bardzo! Co [[jest|byc|x]] na obiad?', ar: 'جداً! ماذا على الغداء؟' }
       ]
     },
     {
       id: 'L10', title: 'التشجيع والفخر', sub: 'كلمات تبني ثقة ابنك بنفسه', unit: 'الأسرة: الأولاد', who: SON,
       phrases: [
-        { pl: 'Jestem z ciebie [[dumny|dumny|m]].', ar: 'أنا فخور بك.', tr: 'يستيم ز تشيبيي دومني', note: 'هذه صيغة الرجل. الأم تقول: dumna.' },
+        { pl: '[[Jestem|byc|x]] z ciebie [[dumny|dumny|m]].', ar: 'أنا فخور بك.', tr: 'يستيم ز تشيبيي دومني', note: 'هذه صيغة الرجل. الأم تقول: dumna.' },
         { pl: '[[Dobra|dobry|f]] robota!', ar: 'عمل رائع!', tr: 'دوبرا روبوتا', note: 'robota (عمل) مؤنثة، لذلك dobra.' },
-        { pl: 'Wierzę w ciebie.', ar: 'أنا أؤمن بك.', tr: 'فييجي ف تشيبيي' },
+        { pl: 'Wierzę w ciebie.', ar: 'أنا أؤمن بك.', tr: 'فييژي ف تشيبيي' },
         { pl: 'Dasz radę!', ar: 'ستقدر عليها!', tr: 'داش رادي' },
-        { pl: 'Jesteś bardzo [[mądry|madry|m]].', ar: 'أنت ذكي جداً.', tr: 'يستيش باردزو موندري', note: 'للبنت: mądra.' },
+        { pl: '[[Jesteś|byc|x]] bardzo [[mądry|madry|m]].', ar: 'أنت ذكي جداً.', tr: 'يستيش باردزو موندري', note: 'للبنت: mądra.' },
         { pl: '[[Kocham|kochac|x]] cię, [[synu|syn]].', ar: 'أحبك يا بني.', tr: 'كوخام تشي، سينو', note: 'synu صيغة النداء (Wołacz). للبنت تقول: córeczko.' }
       ],
       dialog: [
@@ -403,23 +420,23 @@
         { u: 0 },
         { c: 'Ale jutro [[mam|miec|x]] trudny [[mecz|mecz]]…', ar: 'لكن غداً عندي مباراة صعبة…' },
         { u: 3 },
-        { c: 'Nie wiem… Tamta drużyna jest silna.', ar: 'لا أعرف… ذلك الفريق قوي.' },
+        { c: 'Nie wiem… Tamta drużyna [[jest|byc|x]] silna.', ar: 'لا أعرف… ذلك الفريق قوي.' },
         { u: 2 },
-        { c: '[[Myślisz|myslec|x]], że jestem [[dobry|dobry|m]]?', ar: 'هل تظن أنني جيد؟' },
+        { c: '[[Myślisz|myslec|x]], że [[jestem|byc|x]] [[dobry|dobry|m]]?', ar: 'هل تظن أنني جيد؟' },
         { u: 4 },
-        { c: 'Dzięki, tato. Jesteś najlepszy!', ar: 'شكراً يا أبي. أنت الأفضل!' },
+        { c: 'Dzięki, tato. [[Jesteś|byc|x]] najlepszy!', ar: 'شكراً يا أبي. أنت الأفضل!' },
         { u: 5 }
       ]
     },
     {
       id: 'L11', title: 'الاهتمامات والخطط', sub: 'خطط لوقت جميل مع أولادك', unit: 'الأسرة: الأولاد', who: DAUGHTER,
       phrases: [
-        { pl: 'Jaki [[film|film]] [[chcesz|chciec|x]] obejrzeć?', ar: 'أي فيلم تريد أن تشاهد؟', tr: 'ياكي فيلم خيتسيش أوبيجيتش؟' },
-        { pl: 'Idziemy w sobotę na [[mecz|mecz]]?', ar: 'هل نذهب يوم السبت إلى المباراة؟', tr: 'إيدجيمي ف سوبوتي نا ميتش؟' },
+        { pl: 'Jaki [[film|film]] [[chcesz|chciec|x]] obejrzeć?', ar: 'أي فيلم تريد أن تشاهد؟', tr: 'ياكي فيلم ختسيش أوبيژيتش؟' },
+        { pl: 'Idziemy w sobotę na [[mecz|mecz]]?', ar: 'هل نذهب يوم السبت إلى المباراة؟', tr: 'إيجيمي ف سوبوتي نا ميتش؟' },
         { pl: 'Zagramy razem?', ar: 'هل نلعب معاً؟', tr: 'زاغرامي رازيم؟' },
-        { pl: 'Kim [[są|byc|p]] twoi [[przyjaciele|przyjaciel|p]]?', ar: 'من هم أصدقاؤك؟', tr: 'كيم سوم تفويي بشيياتشيليه؟' },
-        { pl: 'Zjedzmy razem [[kolację|kolacja]].', ar: 'لنتناول العشاء معاً.', tr: 'زيادزمي رازيم كولاتسيي' },
-        { pl: 'Spędzimy weekend z [[rodziną|rodzina]].', ar: 'سنقضي عطلة نهاية الأسبوع مع العائلة.', tr: 'سبيندجيمي ويكيند ز رودجينوم', note: 'بعد z (مع) يأتي الاسم في Narzędnik: rodzina تصبح rodziną.' }
+        { pl: 'Kim [[są|byc|p]] [[twoi|twoj|p]] [[przyjaciele|przyjaciel|p]]?', ar: 'من هم أصدقاؤك؟', tr: 'كيم سوم تفويي بشيياتشيليه؟' },
+        { pl: 'Zjedzmy razem [[kolację|kolacja]].', ar: 'لنتناول العشاء معاً.', tr: 'زييدزمي رازيم كولاتسيي' },
+        { pl: 'Spędzimy weekend z [[rodziną|rodzina]].', ar: 'سنقضي عطلة نهاية الأسبوع مع العائلة.', tr: 'سبينجيمي ويكيند ز روجينوم', note: 'بعد z (مع) يأتي الاسم في Narzędnik: rodzina تصبح rodziną.' }
       ],
       dialog: [
         { c: 'Tato, nudzi mi się.', ar: 'أبي، أشعر بالملل.' },
@@ -428,11 +445,11 @@
         { u: 2 },
         { c: 'Tak! Ale najpierw zadzwonię do [[przyjaciół|przyjaciel|p]].', ar: 'نعم! لكن أولاً سأتصل بأصدقائي.' },
         { u: 3 },
-        { c: 'Ola i Kasia. Są bardzo miłe.', ar: 'أولا وكاشا. إنهما لطيفتان جداً.' },
+        { c: 'Ola i Kasia. [[Są|byc|p]] bardzo [[miłe|mily|p]].', ar: 'أولا وكاشا. إنهما لطيفتان جداً.' },
         { u: 1 },
         { c: 'Super! A w niedzielę?', ar: 'رائع! ويوم الأحد؟' },
         { u: 5 },
-        { c: 'Dobrze. Jestem [[głodna|glodny|f]]!', ar: 'حسناً. أنا جائعة!' },
+        { c: 'Dobrze. [[Jestem|byc|x]] [[głodna|glodny|f]]!', ar: 'حسناً. أنا جائعة!' },
         { u: 4 },
         { c: 'Zawołam mamę!', ar: 'سأنادي أمي!' }
       ]
@@ -440,11 +457,11 @@
     {
       id: 'L12', title: 'تصبحين على خير', sub: 'كلمات هادئة في آخر اليوم', unit: 'الأسرة: الزوجة', who: WIFE,
       phrases: [
-        { pl: 'Jesteś [[zmęczona|zmeczony|f]]?', ar: 'هل أنتِ متعبة؟', tr: 'يستيش زميتشونا؟' },
-        { pl: 'Dziękuję za ten [[piękny|piekny|m]] [[dzień|dzien]].', ar: 'شكراً على هذا اليوم الجميل.', tr: 'دجينكويي زا تين بيينكني جين' },
-        { pl: '[[Kocham|kochac|x]] cię coraz bardziej.', ar: 'أحبكِ أكثر فأكثر.', tr: 'كوخام تشي تسوراز بارديي' },
+        { pl: '[[Jesteś|byc|x]] [[zmęczona|zmeczony|f]]?', ar: 'هل أنتِ متعبة؟', tr: 'يستيش زميتشونا؟' },
+        { pl: 'Dziękuję za ten [[piękny|piekny|m]] [[dzień|dzien]].', ar: 'شكراً على هذا اليوم الجميل.', tr: 'جينكويي زا تين بيينكني جين', note: 'ten و piękny مذكرتان لأنهما تصفان dzień، وهي كلمة مذكرة.' },
+        { pl: '[[Kocham|kochac|x]] cię coraz bardziej.', ar: 'أحبكِ أكثر فأكثر.', tr: 'كوخام تشي تسوراز بارجيي' },
         { pl: 'Dobranoc, [[kochanie|kochanie]].', ar: 'تصبحين على خير يا حبيبتي.', tr: 'دوبرانوتس، كوخانيي' },
-        { pl: 'Śpij dobrze.', ar: 'نامي جيداً.', tr: 'شبيي دوبجي' },
+        { pl: 'Śpij dobrze.', ar: 'نامي جيداً.', tr: 'شبيي دوبژي' },
         { pl: 'Słodkich snów.', ar: 'أحلاماً سعيدة.', tr: 'سووتكيخ سنوف' }
       ],
       dialog: [
@@ -454,7 +471,7 @@
         { u: 1 },
         { c: 'To ja dziękuję. [[Kocham|kochac|x]] cię.', ar: 'بل أنا من يشكرك. أحبك.' },
         { u: 2 },
-        { c: 'Idę spać. Jestem śpiąca.', ar: 'سأذهب للنوم. أنا نعسانة.' },
+        { c: 'Idę spać. [[Jestem|byc|x]] śpiąca.', ar: 'سأذهب للنوم. أنا نعسانة.' },
         { u: 3 },
         { c: 'Dobranoc.', ar: 'تصبح على خير.' },
         { u: 4 },
