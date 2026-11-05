@@ -187,8 +187,8 @@ button, select { font: inherit; color: inherit; }
 .answer-btn { justify-self: start; min-height: 42px; }
 .say.pass .say-status { color: var(--ok); font-weight: 600; }
 .heard-line { color: var(--muted); font-size: .88rem; }
-.good { color: var(--ok); }
-.bad { color: var(--bad); font-weight: 700; text-decoration: underline wavy; text-underline-offset: 4px; }
+.pl .good { color: var(--ok); }
+.pl .bad { color: var(--bad); font-weight: 700; text-decoration: underline wavy; text-underline-offset: 4px; }
 .say-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .say-actions .btn { flex: 1 1 auto; }
 .say-card { border-style: dashed; }

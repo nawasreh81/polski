@@ -1,5 +1,5 @@
 /* Offline support: the app files are cached on install; fonts are cached the first time they load. */
-const CACHE = 'polski-dom-v4';
+const CACHE = 'polski-dom-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -17,7 +17,10 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ASSETS); }).then(function () { return self.skipWaiting(); }));
+  // cache: 'reload' skips the browser's own cache, so an update never mixes old and new files.
+  e.waitUntil(caches.open(CACHE).then(function (c) {
+    return c.addAll(ASSETS.map(function (u) { return new Request(u, { cache: 'reload' }); }));
+  }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {

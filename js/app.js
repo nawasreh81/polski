@@ -814,7 +814,6 @@
   }
   async function testQuestion(F, p, kind) {
     F.stage.innerHTML = '';
-    const it = item(p.id);
     let correct = false;
     const card = h('<article class="card"></article>');
     F.stage.appendChild(card);
@@ -928,6 +927,8 @@
 
     if (LISTENING.indexOf(kind) !== -1) { S.listen.t++; if (correct) S.listen.r++; }
     if (SPOKEN.indexOf(kind) !== -1) { S.speak.t++; if (correct) S.speak.r++; }
+    // Read after the answer: a cloud sync may have replaced S while the question was open.
+    const it = item(p.id);
     it.seen++;
     it.lastKind = kind;
     if (correct) { it.right++; it.failedKinds = []; }
